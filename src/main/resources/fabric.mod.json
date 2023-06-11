@@ -1,0 +1,42 @@
+{
+	"schemaVersion": 1,
+	"id": "bafmod2",
+	"version": "${version}",
+	"name": "Bafmaster's Infinite Quest",
+	"description": "AI-powered Nitwits?",
+	"authors": [
+		"Bafmaster",
+		"ChatGPT"
+	],
+	"contact": {
+		"homepage": "https://github.com/Regular-Baf",
+		"sources": "https://github.com/Regular-Baf/bafmod2"
+	},
+	"license": "GNU General Public License v3.0",
+	"icon": "assets/bafmod2/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			{
+				"value": "baf.quest.Bafmod2",
+				"adapter": "kotlin"
+			}
+		],
+		"fabric-datagen": [
+			{
+				"value": "baf.quest.Bafmod2DataGenerator",
+				"adapter": "kotlin"
+			}
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.14.21",
+		"minecraft": "~1.20",
+		"java": ">=17",
+		"fabric-api": "*",
+		"fabric-language-kotlin": ">=1.8.22"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
