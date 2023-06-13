@@ -63,8 +63,11 @@ class Bafmod2Commands {
 
         val postData = """
         {
-            "prompt": "$message",
-            "stream": true
+            "prompt": "You are a helpful Minecraft assistant who helps answer the player's questions.\n<human>: Hey can you help me?\n<bot>: Sure, let me know what you need help with, and I'll do my best to help.\n<human>: $message\n<bot>:",
+            "stream": true,
+            "max_tokens": 64,
+            "temperature": 0.7,
+            "top_p": 0.9
         }
     """.trimIndent()
 
@@ -117,7 +120,7 @@ class Bafmod2Commands {
             println("Response: $responseString")
 
             val minecraftClient = MinecraftClient.getInstance()
-            val chatText: Text = Text.of("[local.ai] $responseString")
+            val chatText: Text = Text.of("[local.ai]$responseString")
             minecraftClient.inGameHud.chatHud.addMessage(chatText)
 
             println("Message successfully sent to the API.")
