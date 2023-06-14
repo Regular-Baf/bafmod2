@@ -19,26 +19,43 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
-import java.util.stream.Collectors
 
 class Bafmod2Commands {
     init {
         createConfigFileIfNeeded()
 
         CommandRegistrationCallback.EVENT.register { commandDispatcher: CommandDispatcher<ServerCommandSource>, _: CommandRegistryAccess, _: CommandManager.RegistrationEnvironment ->
-            commandDispatcher.register(
-                CommandManager.literal("local.ai")
-                    .then(CommandManager.argument("message", StringArgumentType.greedyString())
-                        .executes { context ->
-                            val message = StringArgumentType.getString(context, "message")
-                            sendToAIChatbot(message)
-                            1
-                        })
-            )
+            val localAiCommand = CommandManager.literal("local.ai")
+                .then(CommandManager.argument("message", StringArgumentType.greedyString())
+                    .executes { context ->
+                        val message = StringArgumentType.getString(context, "message")
+                        sendToAIChatbot(message)
+                        1
+                    })
+
+            val llmCommand = CommandManager.literal("llm")
+                .then(CommandManager.argument("message", StringArgumentType.greedyString())
+                    .executes { context ->
+                        val message = StringArgumentType.getString(context, "message")
+                        sendToAIChatbot(message)
+                        1
+                    })
+
+            commandDispatcher.register(localAiCommand)
+            commandDispatcher.register(llmCommand)
         }
+
+    }
+
+    fun sendChatMessage(message: String) {
+        val minecraftClient = MinecraftClient.getInstance()
+        val playerName = minecraftClient.player?.name?.toString()?.replace(Regex("literal\\{(.*?)\\}"), "$1") ?: ""
+        val chatText = Text.of("§3[$playerName] §f$message")
+        minecraftClient.inGameHud.chatHud.addMessage(chatText)
     }
 
     private fun sendToAIChatbot(message: String) {
+        sendChatMessage(message) // Call sendChatMessage() before sending the message to the API
         val configPath = "./config/Bafmod2Config.json"
         val configFile = File(configPath)
 
@@ -50,11 +67,20 @@ class Bafmod2Commands {
         val configFileContents = configFile.readText()
         val configJson = Gson().fromJson(configFileContents, JsonObject::class.java)
         val apiUrl = configJson.getAsJsonPrimitive("apiUrl")?.asString
+        val prompt = configJson.getAsJsonPrimitive("prompt")?.asString
 
         if (apiUrl == null) {
             println("apiUrl not found in the config file")
             return
         }
+
+        if (prompt == null) {
+            println("prompt not found in the config file")
+            return
+        }
+
+        val formattedPrompt = prompt.replace("{{message}}", message)
+        println("Formatted Prompt: $formattedPrompt")
 
         val url = URL(apiUrl)
         val connection = url.openConnection() as HttpURLConnection
@@ -62,13 +88,13 @@ class Bafmod2Commands {
         connection.doOutput = true
 
         val postData = """
-        {
-            "prompt": "You are a helpful Minecraft assistant who helps answer the player's questions.\n<human>: Hey can you help me?\n<bot>: Sure, let me know what you need help with, and I'll do my best to help.\n<human>: $message\n<bot>:",
-            "stream": true,
-            "max_tokens": 64,
-            "temperature": 0.7,
-            "top_p": 0.9
-        }
+    {
+        "prompt": "$formattedPrompt",
+        "stream": true,
+        "max_tokens": 64,
+        "temperature": 0.5,
+        "top_p": 0.9
+    }
     """.trimIndent()
 
         val postDataBytes = postData.toByteArray(StandardCharsets.UTF_8)
@@ -104,7 +130,7 @@ class Bafmod2Commands {
                         if (choicesArray != null && choicesArray.size() > 0) {
                             val choice = choicesArray[0].asJsonObject
                             val choiceText = choice.getAsJsonPrimitive("text").asString
-                            responseStringBuilder.append(choiceText).append(" ")
+                            responseStringBuilder.append(choiceText).append("")
                         }
                     } catch (e: Exception) {
                         println("Error processing the API response: ${e.message}")
@@ -120,7 +146,7 @@ class Bafmod2Commands {
             println("Response: $responseString")
 
             val minecraftClient = MinecraftClient.getInstance()
-            val chatText: Text = Text.of("[local.ai]$responseString")
+            val chatText: Text = Text.of("§9[local.ai]§f$responseString")
             minecraftClient.inGameHud.chatHud.addMessage(chatText)
 
             println("Message successfully sent to the API.")
@@ -138,10 +164,11 @@ class Bafmod2Commands {
 
         if (!configFile.exists()) {
             val defaultConfigContent = """
-                {
-                  "apiUrl": "http://localhost:8000/completions"
-                }
-            """.trimIndent()
+            {
+              "apiUrl": "http://localhost:8000/completions",
+              "prompt": ""You are a helpful Minecraft assistant who helps answer the player's questions with concise answers in 60 completion_tokens or less.\\n<human>: Hey can you help me?\\n<bot>: Sure, let me know what you need help with, and I'll do my best to help.\\n<human>: {{message}}\\n<bot>:""
+            }
+        """.trimIndent()
 
             try {
                 FileWriter(configFile).use { writer ->
